@@ -1,7 +1,7 @@
 import React from 'react';
-import { Calendar, Trash2, CheckCircle2, PlayCircle, Clock } from 'lucide-react';
+import { Calendar, Trash2, CheckCircle2, PlayCircle, Clock, Edit3, AlertCircle, User, Mail } from 'lucide-react';
 
-const TaskCard = ({ task, onStatusChange, onDelete }) => {
+const TaskCard = ({ task, onStatusChange, onDelete, onEdit }) => {
   const getStatusStyle = (status) => {
     switch (status) {
       case 'Pending':
@@ -36,6 +36,45 @@ const TaskCard = ({ task, onStatusChange, onDelete }) => {
   const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'short', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  const getDueDateBadge = (dueDateString) => {
+    if (!dueDateString) return null;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const dueDate = new Date(dueDateString);
+    dueDate.setHours(0, 0, 0, 0);
+    
+    const diffTime = dueDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    let text = '';
+    let color = '';
+    let bgColor = '';
+    let isOverdue = false;
+    
+    if (diffDays < 0) {
+      text = `Overdue: ${formatDate(dueDateString)}`;
+      color = '#ef4444';
+      bgColor = 'rgba(239, 68, 68, 0.1)';
+      isOverdue = true;
+    } else if (diffDays === 0) {
+      text = 'Due: Today';
+      color = '#f97316';
+      bgColor = 'rgba(249, 115, 22, 0.1)';
+    } else if (diffDays === 1) {
+      text = 'Due: Tomorrow';
+      color = '#eab308';
+      bgColor = 'rgba(234, 179, 8, 0.1)';
+    } else {
+      text = `Due: ${formatDate(dueDateString)}`;
+      color = 'var(--text-secondary)';
+      bgColor = 'var(--bg-tertiary)';
+    }
+    
+    return { text, color, bgColor, isOverdue };
   };
 
   return (
@@ -130,6 +169,57 @@ const TaskCard = ({ task, onStatusChange, onDelete }) => {
         }}>
           {task.description}
         </p>
+
+        {/* Due Date Indicator */}
+        {task.dueDate && (() => {
+          const badge = getDueDateBadge(task.dueDate);
+          if (!badge) return null;
+          return (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-sm)',
+              color: badge.color,
+              backgroundColor: badge.bgColor,
+              marginBottom: '15px',
+              border: badge.isOverdue ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid var(--border-color)'
+            }}>
+              {badge.isOverdue ? <AlertCircle size={14} /> : <Calendar size={14} />}
+              {badge.text}
+            </div>
+          );
+        })()}
+
+        {/* Assignee Badge */}
+        {task.assigneeEmail && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.78rem',
+            fontWeight: 500,
+            padding: '5px 10px',
+            borderRadius: 'var(--radius-sm)',
+            backgroundColor: 'rgba(16, 185, 129, 0.07)',
+            border: '1px solid rgba(16, 185, 129, 0.15)',
+            color: 'var(--text-secondary)',
+            marginBottom: '12px',
+            maxWidth: '100%',
+            overflow: 'hidden'
+          }}>
+            <User size={12} style={{ color: '#10b981', flexShrink: 0 }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {task.assigneeName
+                ? <><strong style={{ color: 'var(--text-primary)' }}>{task.assigneeName}</strong> &mdash; {task.assigneeEmail}</>
+                : task.assigneeEmail
+              }
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Action Footer */}
@@ -181,23 +271,44 @@ const TaskCard = ({ task, onStatusChange, onDelete }) => {
           )}
         </div>
 
-        {/* Delete Action */}
-        <button
-          onClick={() => onDelete(task.id)}
-          className="btn btn-danger btn-sm"
-          style={{
-            width: '32px',
-            height: '32px',
-            padding: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 'var(--radius-sm)'
-          }}
-          aria-label="Delete Task"
-        >
-          <Trash2 size={16} />
-        </button>
+        {/* Right side Actions (Edit & Delete) */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {/* Edit Action */}
+          <button
+            onClick={() => onEdit(task)}
+            className="btn btn-secondary btn-sm"
+            style={{
+              width: '32px',
+              height: '32px',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 'var(--radius-sm)'
+            }}
+            aria-label="Edit Task"
+          >
+            <Edit3 size={15} />
+          </button>
+
+          {/* Delete Action */}
+          <button
+            onClick={() => onDelete(task.id)}
+            className="btn btn-danger btn-sm"
+            style={{
+              width: '32px',
+              height: '32px',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 'var(--radius-sm)'
+            }}
+            aria-label="Delete Task"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import taskService from '../services/taskService';
-import { ArrowLeft, Save, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Save, PlusCircle, User, Mail } from 'lucide-react';
 
 const AddTask = () => {
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('Pending');
+  const [dueDate, setDueDate] = useState('');
+  const [assigneeName, setAssigneeName] = useState('');
+  const [assigneeEmail, setAssigneeEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [errors, setErrors] = useState({});
@@ -19,6 +22,9 @@ const AddTask = () => {
     }
     if (description.trim().length < 20) {
       tempErrors.description = 'Description must be at least 20 characters long';
+    }
+    if (assigneeEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assigneeEmail)) {
+      tempErrors.assigneeEmail = 'Please enter a valid email address';
     }
     setErrors(tempErrors);
     return Object.keys(tempErrors).length === 0;
@@ -38,7 +44,10 @@ const AddTask = () => {
       await taskService.createTask({
         title: title.trim(),
         description: description.trim(),
-        status
+        status,
+        dueDate: dueDate || null,
+        assigneeName: assigneeName.trim() || null,
+        assigneeEmail: assigneeEmail.trim() || null
       });
       navigate('/');
     } catch (err) {
@@ -146,20 +155,36 @@ const AddTask = () => {
               {errors.title && <span className="form-error">{errors.title}</span>}
             </div>
 
-            {/* Status Option */}
-            <div className="form-group">
-              <label className="form-label" htmlFor="status">Initial Status</label>
-              <select
-                id="status"
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="form-input"
-                style={{ cursor: 'pointer' }}
-              >
-                <option value="Pending">Pending</option>
-                <option value="In Progress">In Progress</option>
-              </select>
-              {errors.status && <span className="form-error">{errors.status}</span>}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              {/* Status Option */}
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" htmlFor="status">Initial Status</label>
+                <select
+                  id="status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="form-input"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="In Progress">In Progress</option>
+                </select>
+                {errors.status && <span className="form-error">{errors.status}</span>}
+              </div>
+
+              {/* Due Date Option */}
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" htmlFor="due-date">Due Date (Optional)</label>
+                <input
+                  id="due-date"
+                  type="date"
+                  className="form-input"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  style={{ cursor: 'pointer' }}
+                />
+                {errors.dueDate && <span className="form-error">{errors.dueDate}</span>}
+              </div>
             </div>
 
             {/* Description */}
@@ -181,6 +206,71 @@ const AddTask = () => {
                 style={{ resize: 'vertical', lineHeight: '1.6' }}
               />
               {errors.description && <span className="form-error">{errors.description}</span>}
+            </div>
+
+            {/* Assignee Section */}
+            <div style={{
+              padding: '18px 20px',
+              borderRadius: 'var(--radius-md)',
+              border: '1px dashed var(--border-color)',
+              backgroundColor: 'rgba(99, 102, 241, 0.03)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  width: '28px', height: '28px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                  color: 'var(--accent-color)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <Mail size={14} />
+                </div>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Email Notification (Optional)</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>An email alert will be sent to the assignee when this task is created.</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                {/* Assignee Name */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" htmlFor="assignee-name">
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <User size={13} /> Assignee Name
+                    </span>
+                  </label>
+                  <input
+                    id="assignee-name"
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. John Doe"
+                    value={assigneeName}
+                    onChange={(e) => setAssigneeName(e.target.value)}
+                  />
+                  {errors.assigneeName && <span className="form-error">{errors.assigneeName}</span>}
+                </div>
+
+                {/* Assignee Email */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" htmlFor="assignee-email">
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Mail size={13} /> Assignee Email
+                    </span>
+                  </label>
+                  <input
+                    id="assignee-email"
+                    type="email"
+                    className="form-input"
+                    placeholder="e.g. john@example.com"
+                    value={assigneeEmail}
+                    onChange={(e) => setAssigneeEmail(e.target.value)}
+                  />
+                  {errors.assigneeEmail && <span className="form-error">{errors.assigneeEmail}</span>}
+                </div>
+              </div>
             </div>
 
             {/* Action Buttons */}

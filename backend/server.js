@@ -8,6 +8,7 @@ const errorHandler = require('./middleware/errorHandler');
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
 const taskRoutes = require('./routes/taskRoutes');
+const chatbotRoutes = require('./routes/chatbotRoutes');
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.get('/health', (req, res) => {
 // Register API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // Error Handling Middleware
 app.use(errorHandler);
@@ -37,9 +39,21 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log('Database connection has been established successfully.');
 
+    // Manually handle table alterations to avoid Sequelize SQLite sync({ alter: true }) issues
+    try {
+      await sequelize.query('ALTER TABLE `tasks` ADD COLUMN `assignee_name` VARCHAR(255);');
+    } catch (err) {
+      // Ignore if column already exists
+    }
+    try {
+      await sequelize.query('ALTER TABLE `tasks` ADD COLUMN `assignee_email` VARCHAR(255);');
+    } catch (err) {
+      // Ignore if column already exists
+    }
+
     // Sync models (creates tables if they don't exist)
     // In production, we'd use migrations, but for assessment, sync is clean & standard.
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     console.log('Database synced successfully.');
 
     if (process.env.NODE_ENV !== 'test') {

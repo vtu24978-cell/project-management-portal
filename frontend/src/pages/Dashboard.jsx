@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import taskService from '../services/taskService';
 import Stats from '../components/Stats';
+import TaskChart from '../components/TaskChart';
 import TaskCard from '../components/TaskCard';
 import LoadingSkeleton from '../components/LoadingSkeleton';
 import EmptyState from '../components/EmptyState';
+import EditTaskModal from '../components/EditTaskModal';
 import { Plus, Search, Filter, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Dashboard = () => {
@@ -18,8 +20,13 @@ const Dashboard = () => {
   const [searchVal, setSearchVal] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(''); // '' means All
+  const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('DESC');
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Edit Task Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [taskToEdit, setTaskToEdit] = useState(null);
 
   // Debounce search input
   useEffect(() => {
@@ -41,7 +48,7 @@ const Dashboard = () => {
       const params = {
         page: currentPage,
         limit: 6,
-        sortBy: 'createdAt',
+        sortBy: sortBy,
         order: sortOrder
       };
 
@@ -58,10 +65,21 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearch, statusFilter, sortOrder]);
+  }, [currentPage, debouncedSearch, statusFilter, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchTasks();
+  }, [fetchTasks]);
+
+  // Global event listener for chatbot updates
+  useEffect(() => {
+    const handleTasksUpdated = () => {
+      fetchTasks();
+    };
+    window.addEventListener('tasks-updated', handleTasksUpdated);
+    return () => {
+      window.removeEventListener('tasks-updated', handleTasksUpdated);
+    };
   }, [fetchTasks]);
 
   // Handle task status transition
@@ -93,11 +111,18 @@ const Dashboard = () => {
   const handleClearFilters = () => {
     setSearchVal('');
     setStatusFilter('');
+    setSortBy('createdAt');
     setSortOrder('DESC');
     setCurrentPage(1);
   };
 
-  const isFiltered = !!(searchVal || statusFilter || sortOrder !== 'DESC');
+  const isFiltered = !!(searchVal || statusFilter || sortBy !== 'createdAt' || sortOrder !== 'DESC');
+
+  // Open Edit Task modal
+  const handleEditTask = (task) => {
+    setTaskToEdit(task);
+    setIsEditModalOpen(true);
+  };
 
   return (
     <div style={{
@@ -138,8 +163,11 @@ const Dashboard = () => {
           </Link>
         </div>
 
-        {/* Dashboard Statistics */}
-        <Stats stats={stats} />
+        {/* Dashboard Statistics & Analytics Charts */}
+        <div className="dashboard-stats-layout">
+          <Stats stats={stats} />
+          <TaskChart stats={stats} />
+        </div>
 
         {/* Control Bar (Search, Status Filter, Sorting) */}
         <div className="glass" style={{
@@ -212,9 +240,22 @@ const Dashboard = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ArrowUpDown size={16} style={{ color: 'var(--text-secondary)' }} />
               <select
-                value={sortOrder}
+                value={`${sortBy}_${sortOrder}`}
                 onChange={(e) => {
-                  setSortOrder(e.target.value);
+                  const val = e.target.value;
+                  if (val === 'createdAt_DESC') {
+                    setSortBy('createdAt');
+                    setSortOrder('DESC');
+                  } else if (val === 'createdAt_ASC') {
+                    setSortBy('createdAt');
+                    setSortOrder('ASC');
+                  } else if (val === 'dueDate_ASC') {
+                    setSortBy('dueDate');
+                    setSortOrder('ASC');
+                  } else if (val === 'dueDate_DESC') {
+                    setSortBy('dueDate');
+                    setSortOrder('DESC');
+                  }
                   setCurrentPage(1);
                 }}
                 className="form-input"
@@ -222,13 +263,15 @@ const Dashboard = () => {
                   padding: '8px 12px',
                   borderRadius: 'var(--radius-sm)',
                   fontSize: '0.85rem',
-                  width: '150px',
+                  width: '160px',
                   height: '38px',
                   cursor: 'pointer'
                 }}
               >
-                <option value="DESC">Newest First</option>
-                <option value="ASC">Oldest First</option>
+                <option value="createdAt_DESC">Newest Created</option>
+                <option value="createdAt_ASC">Oldest Created</option>
+                <option value="dueDate_ASC">Soonest Due</option>
+                <option value="dueDate_DESC">Furthest Due</option>
               </select>
             </div>
           </div>
@@ -265,6 +308,7 @@ const Dashboard = () => {
                     task={task}
                     onStatusChange={handleStatusChange}
                     onDelete={handleDeleteTask}
+                    onEdit={handleEditTask}
                   />
                 </div>
               ))}
@@ -314,6 +358,19 @@ const Dashboard = () => {
           />
         )}
       </div>
+
+      {/* Edit Task Modal */}
+      {taskToEdit && (
+        <EditTaskModal
+          task={taskToEdit}
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setTaskToEdit(null);
+          }}
+          onUpdateSuccess={fetchTasks}
+        />
+      )}
     </div>
   );
 };

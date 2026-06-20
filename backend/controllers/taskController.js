@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const Task = require('../models/Task');
+const { sendTaskNotification } = require('../utils/mailer');
 
 // @desc    Get all tasks with filtering, search, pagination, sorting & statistics
 // @route   GET /api/tasks
@@ -31,7 +32,8 @@ const getTasks = async (req, res, next) => {
     const offset = (pageVal - 1) * limitVal;
 
     // 3. Sorting Details
-    const sortByVal = sortBy || 'createdAt';
+    const validSortFields = ['createdAt', 'dueDate', 'title', 'status'];
+    const sortByVal = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
     const orderVal = order && ['ASC', 'DESC'].includes(order.toUpperCase()) ? order.toUpperCase() : 'DESC';
 
     // 4. Execute Paginated Query
@@ -75,15 +77,30 @@ const getTasks = async (req, res, next) => {
 // @access  Private
 const createTask = async (req, res, next) => {
   try {
-    const { title, description, status } = req.body;
+    const { title, description, status, dueDate, assigneeName, assigneeEmail } = req.body;
     const userId = req.user.id;
 
     const task = await Task.create({
       title,
       description,
       status: status || 'Pending',
+      dueDate: dueDate || null,
+      assigneeName: assigneeName || null,
+      assigneeEmail: assigneeEmail || null,
       userId
     });
+
+    // Fire email notification asynchronously if assignee email is provided
+    if (assigneeEmail) {
+      sendTaskNotification(
+        assigneeEmail,
+        assigneeName || 'Assignee',
+        title,
+        description
+      ).catch((err) => {
+        console.error('[EMAIL] Failed to send task notification:', err.message);
+      });
+    }
 
     res.status(201).json(task);
   } catch (error) {
@@ -97,7 +114,7 @@ const createTask = async (req, res, next) => {
 const updateTask = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { title, description, status } = req.body;
+    const { title, description, status, dueDate, assigneeName, assigneeEmail } = req.body;
     const userId = req.user.id;
 
     // Find the task and verify ownership
@@ -112,6 +129,9 @@ const updateTask = async (req, res, next) => {
     if (title !== undefined) task.title = title;
     if (description !== undefined) task.description = description;
     if (status !== undefined) task.status = status;
+    if (dueDate !== undefined) task.dueDate = dueDate || null;
+    if (assigneeName !== undefined) task.assigneeName = assigneeName || null;
+    if (assigneeEmail !== undefined) task.assigneeEmail = assigneeEmail || null;
 
     await task.save();
 

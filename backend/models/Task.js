@@ -35,6 +35,24 @@ const Task = sequelize.define('Task', {
         msg: 'Status must be Pending, In Progress, or Completed'
       }
     }
+  },
+  dueDate: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+    validate: {
+      isDate: { msg: 'Due date must be a valid date' }
+    }
+  },
+  assigneeName: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  assigneeEmail: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: {
+      isEmail: { msg: 'Please enter a valid email address for the assignee' }
+    }
   }
 });
 

@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import AddTask from './pages/AddTask';
 import authService from './services/authService';
+import ChatbotWidget from './components/ChatbotWidget';
 
 // Wrapper for protected routes
 const ProtectedRoute = ({ children }) => {
@@ -14,6 +15,7 @@ const ProtectedRoute = ({ children }) => {
     <>
       <Navbar />
       {children}
+      <ChatbotWidget />
     </>
   ) : (
     <Navigate to="/login" replace />

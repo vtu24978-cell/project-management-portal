@@ -4,6 +4,12 @@ const sequelize = require('../config/database');
 const User = require('../models/User');
 const Task = require('../models/Task');
 
+// Mock the mailer so tests don't attempt real SMTP connections
+jest.mock('../utils/mailer', () => ({
+  sendTaskNotification: jest.fn().mockResolvedValue({ mock: true })
+}));
+const { sendTaskNotification } = require('../utils/mailer');
+
 let token1;
 let token2;
 let user1Id;
@@ -83,6 +89,83 @@ describe('Tasks API', () => {
       expect(res.statusCode).toBe(400);
       expect(res.body).toHaveProperty('errors');
     });
+
+    it('should create a task with a valid due date', async () => {
+      const res = await request(app)
+        .post('/api/tasks')
+        .set('Authorization', `Bearer ${token1}`)
+        .send({ ...validTask, dueDate: '2026-12-31' });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.dueDate).toBe('2026-12-31');
+    });
+
+    it('should fail task creation if due date is invalid', async () => {
+      const res = await request(app)
+        .post('/api/tasks')
+        .set('Authorization', `Bearer ${token1}`)
+        .send({ ...validTask, dueDate: 'invalid-date' });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toHaveProperty('errors');
+    });
+
+    it('should save assignee name and email on task creation', async () => {
+      const res = await request(app)
+        .post('/api/tasks')
+        .set('Authorization', `Bearer ${token1}`)
+        .send({
+          ...validTask,
+          assigneeName: 'John Doe',
+          assigneeEmail: 'john@example.com'
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.assigneeName).toBe('John Doe');
+      expect(res.body.assigneeEmail).toBe('john@example.com');
+    });
+
+    it('should trigger email notification when assignee email is provided', async () => {
+      sendTaskNotification.mockClear();
+
+      await request(app)
+        .post('/api/tasks')
+        .set('Authorization', `Bearer ${token1}`)
+        .send({
+          ...validTask,
+          assigneeName: 'Jane Smith',
+          assigneeEmail: 'jane@example.com'
+        });
+
+      // Mailer should have been invoked with correct params
+      expect(sendTaskNotification).toHaveBeenCalledWith(
+        'jane@example.com',
+        'Jane Smith',
+        validTask.title,
+        validTask.description
+      );
+    });
+
+    it('should NOT trigger email notification when no assignee email is given', async () => {
+      sendTaskNotification.mockClear();
+
+      await request(app)
+        .post('/api/tasks')
+        .set('Authorization', `Bearer ${token1}`)
+        .send(validTask);
+
+      expect(sendTaskNotification).not.toHaveBeenCalled();
+    });
+
+    it('should reject invalid assignee email format', async () => {
+      const res = await request(app)
+        .post('/api/tasks')
+        .set('Authorization', `Bearer ${token1}`)
+        .send({ ...validTask, assigneeEmail: 'not-an-email' });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toHaveProperty('errors');
+    });
   });
 
   describe('GET /api/tasks (Retrieve Tasks)', () => {
@@ -152,6 +235,36 @@ describe('Tasks API', () => {
       expect(res.body.tasks.length).toBe(1);
       expect(res.body.tasks[0].title).toContain('search');
     });
+
+    it('should sort tasks by dueDate', async () => {
+      await Task.create({
+        title: 'Soonest due task',
+        description: 'Detail description of task that is due soon.',
+        status: 'Pending',
+        dueDate: '2026-07-01',
+        userId: user1Id
+      });
+      await Task.create({
+        title: 'Latest due task',
+        description: 'Detail description of task that is due late.',
+        status: 'Pending',
+        dueDate: '2026-08-01',
+        userId: user1Id
+      });
+
+      const res = await request(app)
+        .get('/api/tasks?sortBy=dueDate&order=ASC')
+        .set('Authorization', `Bearer ${token1}`);
+
+      expect(res.statusCode).toBe(200);
+      
+      const taskIndexSoonest = res.body.tasks.findIndex(t => t.title === 'Soonest due task');
+      const taskIndexLatest = res.body.tasks.findIndex(t => t.title === 'Latest due task');
+      
+      expect(taskIndexSoonest).toBeGreaterThanOrEqual(0);
+      expect(taskIndexLatest).toBeGreaterThanOrEqual(0);
+      expect(taskIndexSoonest).toBeLessThan(taskIndexLatest);
+    });
   });
 
   describe('PUT /api/tasks/:id (Update Task)', () => {
@@ -184,6 +297,22 @@ describe('Tasks API', () => {
         .send({ status: 'Completed' });
 
       expect(res.statusCode).toBe(404);
+    });
+
+    it('should update task details including dueDate', async () => {
+      const res = await request(app)
+        .put(`/api/tasks/${taskId}`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send({
+          title: 'Updated title',
+          description: 'This is a brand new description exceeding twenty characters.',
+          dueDate: '2026-11-30'
+        });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.title).toBe('Updated title');
+      expect(res.body.description).toBe('This is a brand new description exceeding twenty characters.');
+      expect(res.body.dueDate).toBe('2026-11-30');
     });
   });
 

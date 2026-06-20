@@ -10,9 +10,13 @@ const createTask = async (taskData) => {
   return response.data;
 };
 
-const updateTaskStatus = async (id, status) => {
-  const response = await api.put(`/tasks/${id}`, { status });
+const updateTask = async (id, taskData) => {
+  const response = await api.put(`/tasks/${id}`, taskData);
   return response.data;
+};
+
+const updateTaskStatus = async (id, status) => {
+  return updateTask(id, { status });
 };
 
 const deleteTask = async (id) => {
@@ -23,6 +27,7 @@ const deleteTask = async (id) => {
 const taskService = {
   getTasks,
   createTask,
+  updateTask,
   updateTaskStatus,
   deleteTask
 };
